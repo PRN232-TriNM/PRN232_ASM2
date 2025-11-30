@@ -1,0 +1,215 @@
+@page "/Stations/{id:int}"
+@using EVCS.BlazorWebApp.TriNM.GraphQLClient
+@using EVCS.BlazorWebApp.TriNM.Models
+@using EVCS.BlazorWebApp.TriNM.Services
+@using Microsoft.AspNetCore.Components
+@inject GraphQLConsumer GraphQLConsumer
+@inject NavigationManager Navigation
+@inject StationSignalRService SignalRService
+@implements IAsyncDisposable
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">Station Details</h3>
+                    <a href="/Stations" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </a>
+                </div>
+                <div class="card-body">
+                    @if (isLoading)
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    }
+                    else if (station != null)
+                    {
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Basic Information</h5>
+                                <table class="table table-borderless">
+                                    <tr>
+                                        <td><strong>ID:</strong></td>
+                                        <td>@station.StationTriNMId</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Code:</strong></td>
+                                        <td>@station.StationTriNMCode</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Name:</strong></td>
+                                        <td>@station.StationTriNMName</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Address:</strong></td>
+                                        <td>@station.Address</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Location:</strong></td>
+                                        <td>@station.Location</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Capacity Information</h5>
+                                <table class="table table-borderless">
+                                    <tr>
+                                        <td><strong>Capacity:</strong></td>
+                                        <td>@station.Capacity</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Current Available:</strong></td>
+                                        <td>@station.CurrentAvailable</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Status:</strong></td>
+                                        <td>
+                                            <span class="badge @(station.IsActive ? "bg-success" : "bg-danger")">
+                                                @(station.IsActive ? "Active" : "Inactive")
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Created Date:</strong></td>
+                                        <td>@station.CreatedDate.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                    </tr>
+                                    @if (station.ModifiedDate.HasValue)
+                                    {
+                                        <tr>
+                                            <td><strong>Modified Date:</strong></td>
+                                            <td>@station.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                        </tr>
+                                    }
+                                </table>
+                            </div>
+                        </div>
+                        
+                        @if (station.ChargerTriNMs != null && station.ChargerTriNMs.Any())
+                        {
+                            <div class="row mt-4">
+                                <div class="col-12">
+                                    <h5>Chargers (@station.ChargerTriNMs.Count())</h5>
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>ID</th>
+                                                    <th>Type</th>
+                                                    <th>Available</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var charger in station.ChargerTriNMs)
+                                                {
+                                                    <tr>
+                                                        <td>@charger.ChargerTriNMId</td>
+                                                        <td>@charger.ChargerTriNMType</td>
+                                                        <td>
+                                                            <span class="badge @(charger.IsAvailable ? "bg-success" : "bg-danger")">
+                                                                @(charger.IsAvailable ? "Available" : "Unavailable")
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <a href="/Chargers/@charger.ChargerTriNMId" class="btn btn-sm btn-outline-info">
+                                                                <i class="fas fa-eye"></i> View
+                                                            </a>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning" role="alert">
+                            Station not found.
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private StationTriNM? station;
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStation();
+        
+        SignalRService.StationUpdated += OnStationUpdated;
+        SignalRService.StationDeleted += OnStationDeleted;
+        
+        await SignalRService.StartAsync();
+    }
+
+    private async Task LoadStation()
+    {
+        isLoading = true;
+        try
+        {
+            station = await GraphQLConsumer.GetStationByIdAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading Station: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async void OnStationUpdated(int stationId)
+    {
+        await InvokeAsync(async () =>
+        {
+            if (stationId == Id)
+            {
+                await LoadStation();
+                StateHasChanged();
+            }
+        });
+    }
+
+    private async void OnStationDeleted(int stationId)
+    {
+        await InvokeAsync(async () =>
+        {
+            if (stationId == Id)
+            {
+                await LoadStation();
+                if (station == null)
+                {
+                    Navigation.NavigateTo("/Stations");
+                }
+                else
+                {
+                    StateHasChanged();
+                }
+            }
+        });
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        SignalRService.StationUpdated -= OnStationUpdated;
+        SignalRService.StationDeleted -= OnStationDeleted;
+    }
+}
+

@@ -1,0 +1,6 @@
+@EVCS.GraphQLWebAPI.TriNM_HostAddress = http://localhost:5010
+
+GET {{EVCS.GraphQLWebAPI.TriNM_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,223 @@
+@using EVCS.BlazorWebApp.TriNM.Services
+@using EVCS.BlazorWebApp.TriNM.GraphQLClient
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject AuthenticationService AuthService
+@inject GraphQLConsumer GraphQLConsumer
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<div class="google-login-container">
+    <AuthorizeView>
+        <Authorized>
+            <div class="user-info-dropdown">
+                <button class="btn btn-outline-light user-btn" @onclick="ToggleDropdown">
+                    <i class="bi bi-person-circle"></i>
+                    @context.User.FindFirst("fullName")?.Value ?? @context.User.FindFirst("email")?.Value
+                    <i class="bi bi-chevron-down"></i>
+                </button>
+                @if (showDropdown)
+                {
+                    <div class="dropdown-menu show">
+                        <div class="dropdown-item-text">
+                            <small class="text-muted">@context.User.FindFirst("email")?.Value</small>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item" @onclick="HandleLogout">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </button>
+                    </div>
+                }
+            </div>
+        </Authorized>
+        <NotAuthorized>
+            <div id="google-signin-button"></div>
+        </NotAuthorized>
+    </AuthorizeView>
+</div>
+
+<style>
+    .google-login-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+    }
+
+    .btn-google {
+        background-color: #4285F4;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .btn-google:hover {
+        background-color: #357ae8;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .user-info-dropdown {
+        position: relative;
+    }
+
+    .user-btn {
+        background: white;
+        border: 1px solid #dee2e6;
+        color: #212529;
+        padding: 8px 15px;
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 500;
+    }
+
+    .user-btn:hover {
+        background: #f8f9fa;
+        border-color: #adb5bd;
+    }
+
+    .dropdown-menu {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        margin-top: 5px;
+        min-width: 200px;
+        background: white;
+        border-radius: 5px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        padding: 5px 0;
+    }
+
+    .dropdown-item {
+        width: 100%;
+        text-align: left;
+        padding: 10px 15px;
+        border: none;
+        background: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .dropdown-item:hover {
+        background-color: #f8f9fa;
+    }
+
+    .dropdown-item-text {
+        padding: 10px 15px;
+    }
+</style>
+
+@code {
+    private bool showDropdown = false;
+    private DotNetObjectReference<GoogleLoginButton>? objRef;
+
+    private void ToggleDropdown()
+    {
+        showDropdown = !showDropdown;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var isAuthenticated = await AuthService.IsAuthenticatedAsync();
+            if (!isAuthenticated)
+            {
+                objRef = DotNetObjectReference.Create(this);
+                await JSRuntime.InvokeVoidAsync("setupGoogleSignIn", 
+                    objRef,
+                    "google-signin-button");
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task HandleGoogleCredential(string credential)
+    {
+        if (objRef == null)
+        {
+            Console.WriteLine("DotNetObjectReference is null, cannot handle credential");
+            return;
+        }
+
+        try
+        {
+            if (string.IsNullOrEmpty(credential))
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Failed to receive credential from Google");
+                return;
+            }
+
+            var result = await GraphQLConsumer.GoogleLoginAsync(credential);
+            
+            if (result.Success && !string.IsNullOrEmpty(result.Token))
+            {
+                var loginSuccess = await AuthService.LoginAsync(result.Token);
+                if (loginSuccess)
+                {
+                    await Task.Delay(100);
+                    Navigation.NavigateTo("/", forceLoad: true);
+                }
+                else
+                {
+                    await JSRuntime.InvokeVoidAsync("alert", "Failed to save login token");
+                }
+            }
+            else
+            {
+                var errorMsg = result.Error ?? "Login failed";
+                Console.WriteLine($"Google login error: {errorMsg}");
+                await JSRuntime.InvokeVoidAsync("alert", errorMsg);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in Google login: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Google login error: " + ex.Message);
+            }
+            catch
+            {
+                // Ignore if JSRuntime is not available
+            }
+        }
+    }
+
+    private async Task HandleLogout()
+    {
+        showDropdown = false;
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("cleanupGoogleSignIn", "google-signin-button");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cleaning up Google Sign-In: {ex.Message}");
+        }
+        finally
+        {
+            if (objRef != null)
+            {
+                objRef.Dispose();
+                objRef = null;
+            }
+        }
+    }
+}
+

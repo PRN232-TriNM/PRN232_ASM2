@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EVCS.BlazorWebApp.TriNM</title>
+    <base href="/" />
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link href="EVCS.BlazorWebApp.TriNM.styles.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%" />
+            <circle r="40%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text"></div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+    <script src="_framework/blazor.webassembly.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+        const googleHelpers = new Map();
+        let googleInitialized = false;
+        
+        window.setupGoogleSignIn = (helper, buttonId) => {
+            googleHelpers.set(buttonId, helper);
+            
+            function initializeGoogleSignIn() {
+                if (typeof google !== 'undefined' && typeof google.accounts !== 'undefined') {
+                    if (!googleInitialized) {
+                        google.accounts.id.initialize({
+                            client_id: '708704634199-lav8r95f5tnfrnh0en2hb5ve0gm85t7f.apps.googleusercontent.com',
+                            callback: handleGoogleSignIn
+                        });
+                        googleInitialized = true;
+                    }
+                    
+                    const element = document.getElementById(buttonId);
+                    if (!element) {
+                        console.warn(`Element with id '${buttonId}' not found. Retrying...`);
+                        setTimeout(initializeGoogleSignIn, 100);
+                        return;
+                    }
+                    
+                    try {
+                        google.accounts.id.renderButton(
+                            element,
+                            {
+                                type: 'standard',
+                                size: 'large',
+                                theme: 'outline',
+                                text: 'sign_in_with',
+                                shape: 'rectangular',
+                                logo_alignment: 'left'
+                            }
+                        );
+                        console.log(`Google Sign-In button rendered for ${buttonId}`);
+                    } catch (error) {
+                        console.error(`Error rendering Google button for ${buttonId}:`, error);
+                    }
+                } else {
+                    setTimeout(initializeGoogleSignIn, 100);
+                }
+            }
+            
+            initializeGoogleSignIn();
+        };
+        
+        function handleGoogleSignIn(response) {
+            if (!response || !response.credential) {
+                return;
+            }
+            
+            for (const [buttonId, helper] of googleHelpers.entries()) {
+                try {
+                    const element = document.getElementById(buttonId);
+                    if (element && element.offsetParent !== null) {
+                        if (helper && typeof helper.invokeMethodAsync === 'function') {
+                            helper.invokeMethodAsync('HandleGoogleCredential', response.credential)
+                                .catch(error => {
+                                    console.error('Error invoking HandleGoogleCredential:', error);
+                                });
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error with helper for ${buttonId}:`, error);
+                    googleHelpers.delete(buttonId);
+                }
+            }
+            
+            const firstEntry = googleHelpers.entries().next().value;
+            if (firstEntry) {
+                const [buttonId, helper] = firstEntry;
+                try {
+                    if (helper && typeof helper.invokeMethodAsync === 'function') {
+                        helper.invokeMethodAsync('HandleGoogleCredential', response.credential)
+                            .catch(error => {
+                                console.error('Error invoking HandleGoogleCredential:', error);
+                            });
+                    }
+                } catch (error) {
+                    console.error(`Error with first helper for ${buttonId}:`, error);
+                    googleHelpers.delete(buttonId);
+                }
+            }
+        }
+        
+        window.cleanupGoogleSignIn = (buttonId) => {
+            if (buttonId) {
+                googleHelpers.delete(buttonId);
+                console.log(`Cleaned up Google Sign-In helper for ${buttonId}`);
+            }
+        };
+    </script>
+</body>
+
+</html>

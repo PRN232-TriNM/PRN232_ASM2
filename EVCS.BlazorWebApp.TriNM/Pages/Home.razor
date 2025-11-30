@@ -1,0 +1,127 @@
+﻿@page "/"
+@using EVCS.BlazorWebApp.TriNM.Components
+
+<PageTitle>Home - EVCS</PageTitle>
+
+<div class="google-login-wrapper">
+    <GoogleLoginButton />
+</div>
+
+<div class="container">
+    <div class="row mt-5">
+        <div class="col-12 text-center">
+            <h1 class="display-4 mb-4">
+                <i class="bi bi-ev-station-fill text-primary"></i>
+                Electric Vehicle Charging System
+            </h1>
+            <p class="lead text-muted mb-5">
+                Smart Electric Vehicle Charging Station Management System
+            </p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm hover-card">
+                <div class="card-body text-center">
+                    <i class="bi bi-battery-charging display-1 text-success mb-3"></i>
+                    <h5 class="card-title">Chargers</h5>
+                    <p class="card-text text-muted">View all charging points in the system</p>
+                    <a href="/Chargers" class="btn btn-outline-primary">
+                        View Details <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm hover-card">
+                <div class="card-body text-center">
+                    <i class="bi bi-building display-1 text-info mb-3"></i>
+                    <h5 class="card-title">Stations</h5>
+                    <p class="card-text text-muted">View all charging stations</p>
+                    <a href="/Stations" class="btn btn-outline-primary">
+                        View Details <i class="bi bi-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <AuthorizeView>
+            <Authorized>
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100 shadow-sm hover-card">
+                        <div class="card-body text-center">
+                            <i class="bi bi-person-circle display-1 text-info mb-3"></i>
+                            <h5 class="card-title">Welcome!</h5>
+                            <p class="card-text text-muted">
+                                <strong>@context.User.FindFirst("fullName")?.Value ?? @context.User.FindFirst("email")?.Value</strong>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </Authorized>
+            <NotAuthorized>
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100 shadow-sm hover-card">
+                        <div class="card-body text-center">
+                            <i class="bi bi-graph-up display-1 text-warning mb-3"></i>
+                            <h5 class="card-title">Statistics</h5>
+                            <p class="card-text text-muted">Monitor system performance</p>
+                            <a href="/weather" class="btn btn-outline-primary">
+                                View Statistics <i class="bi bi-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle-fill"></i>
+                <strong>System Information:</strong> You are accessing the Electric Vehicle Charging Station Management System.
+                Use the left menu to navigate to other features.
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hover-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .hover-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15) !important;
+    }
+
+    .display-1 {
+        font-size: 4rem;
+    }
+
+    .btn {
+        transition: all 0.3s ease;
+    }
+
+    .btn:hover {
+        transform: scale(1.05);
+    }
+
+    code {
+        background-color: #f8f9fa;
+        padding: 2px 6px;
+        border-radius: 4px;
+        color: #d63384;
+    }
+
+    .google-login-wrapper {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+    }
+</style>
